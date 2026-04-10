@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Assembly Line KPI Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #060b14;
+    --surface: #0d1520;
+    --surface2: #111d2c;
+    --border: #1a2d42;
+    --border2: #1e3550;
+    --cyan: #00e5ff;
+    --cyan-dim: #00b8cc;
+    --green: #00ff87;
+    --green-dim: #00cc6a;
+    --amber: #ffb300;
+    --red: #ff3d57;
+    --text: #c8ddf0;
+    --text-dim: #5a7a96;
+    --text-bright: #e8f4ff;
+    --glow-cyan: 0 0 20px rgba(0,229,255,0.3);
+    --glow-green: 0 0 20px rgba(0,255,135,0.3);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrapper { position: relative; z-index: 1; max-width: 1600px; margin: 0 auto; padding: 0 24px 40px; }
+
+  /* ---- HEADER ---- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0 16px;
+    border-bottom: 1px solid var(--border2);
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .logo-block { display: flex; align-items: baseline; gap: 12px; }
+
+  h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-bright);
+    text-shadow: 0 0 30px rgba(0,229,255,0.4);
+  }
+
+  h1 span { color: var(--cyan); }
+
+  .subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .meta-block {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  .meta-block strong { color: var(--text); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(0,255,135,0.08);
+    border: 1px solid rgba(0,255,135,0.25);
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.15em;
+    color: var(--green);
+  }
+
+  .pulse {
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    box-shadow: var(--glow-green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(0.8)} }
+
+  /* ---- SECTION LABELS ---- */
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ---- KPI CARDS ---- */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+
+  .kpi-card.oee::before { background: linear-gradient(90deg, var(--cyan), transparent); }
+  .kpi-card.avail::before { background: linear-gradient(90deg, var(--green), transparent); }
+  .kpi-card.perf::before { background: linear-gradient(90deg, var(--amber), transparent); }
+  .kpi-card.qual::before { background: linear-gradient(90deg, #a78bfa, transparent); }
+  .kpi-card.parts::before { background: linear-gradient(90deg, #f472b6, transparent); }
+
+  .kpi-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.18em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .kpi-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .kpi-card.oee .kpi-value { color: var(--cyan); text-shadow: var(--glow-cyan); }
+  .kpi-card.avail .kpi-value { color: var(--green); text-shadow: var(--glow-green); }
+  .kpi-card.perf .kpi-value { color: var(--amber); }
+  .kpi-card.qual .kpi-value { color: #a78bfa; }
+  .kpi-card.parts .kpi-value { color: #f472b6; }
+
+  .kpi-unit {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+
+  .kpi-sub {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    margin-top: 6px;
+  }
+
+  /* ---- CHART PANELS ---- */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .chart-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+  }
+
+  .panel-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .panel-title span { 
+    color: var(--cyan);
+    font-size: 0.65rem;
+  }
+
+  .chart-wrap { position: relative; height: 200px; }
+
+  /* ---- STATION GRID ---- */
+  .station-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .stn-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s, transform 0.2s;
+    cursor: default;
+  }
+
+  .stn-card:hover {
+    border-color: var(--cyan);
+    transform: translateY(-2px);
+  }
+
+  .stn-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 12px;
+  }
+
+  .stn-name {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-bright);
+    line-height: 1.3;
+  }
+
+  .stn-plc {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .stn-status {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+
+  .stn-status.ok { background: var(--green); box-shadow: var(--glow-green); }
+  .stn-status.warn { background: var(--amber); }
+  .stn-status.fault { background: var(--red); }
+
+  .stn-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 10px;
+  }
+
+  .stn-metric-item {}
+
+  .stn-metric-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+
+  .stn-metric-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-bright);
+  }
+
+  .stn-oee-bar {
+    margin-top: 12px;
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .stn-oee-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--green));
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  /* ---- BOTTOM CHARTS ---- */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  /* ---- SUB-STATION TABLE ---- */
+  .sub-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .table-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    overflow: hidden;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+  }
+
+  th {
+    text-align: left;
+    color: var(--text-dim);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-size: 0.6rem;
+    font-weight: 400;
+    padding: 0 10px 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 9px 10px 9px 0;
+    border-bottom: 1px solid rgba(26,45,66,0.5);
+    color: var(--text);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .td-val {
+    font-family: 'Orbitron', monospace;
+    font-weight: 500;
+    color: var(--text-bright);
+  }
+
+  .alarm-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+  }
+
+  .alarm-ok { background: rgba(0,255,135,0.12); color: var(--green); border: 1px solid rgba(0,255,135,0.25); }
+  .alarm-warn { background: rgba(255,179,0,0.12); color: var(--amber); border: 1px solid rgba(255,179,0,0.25); }
+
+  .bar-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .bar-inline-track {
+    flex: 1;
+    height: 4px;
+    background: var(--border2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .bar-inline-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--cyan);
+  }
+
+  /* ---- ANNOTATIONS ---- */
+  .insight-box {
+    background: rgba(0,229,255,0.04);
+    border: 1px solid rgba(0,229,255,0.15);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 6px 6px 0;
+    padding: 14px 18px;
+    margin-bottom: 28px;
+  }
+
+  .insight-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    color: var(--cyan);
+    margin-bottom: 8px;
+  }
+
+  .insights-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .insight-item {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  .insight-item strong { color: var(--text); }
+
+  /* Footer */
+  .footer {
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+  }
+
+  /* Responsive */
+  @media (max-width: 1100px) {
+    .station-grid { grid-template-columns: repeat(2, 1fr); }
+    .kpi-row { grid-template-columns: repeat(3, 1fr); }
+    .bottom-row { grid-template-columns: 1fr 1fr; }
+  }
+
+  @media (max-width: 700px) {
+    .charts-row { grid-template-columns: 1fr; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .station-grid { grid-template-columns: 1fr 1fr; }
+    .sub-section { grid-template-columns: 1fr; }
+    .insights-grid { grid-template-columns: 1fr; }
+    .bottom-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-block">
+      <div>
+        <h1>VALVE ASSEMBLY <span>LINE</span></h1>
+        <div class="subtitle">NCA&T ISE Senior Design &mdash; PLC KPI Dashboard</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="meta-block">
+        <div>Session <strong>2026-02-16</strong> &nbsp; 14:25 &ndash; 14:47</div>
+        <div>8 PLCs &nbsp;&bull;&nbsp; 59 source files &nbsp;&bull;&nbsp; IPs 192.168.50.171–179</div>
+      </div>
+      <div class="status-pill">
+        <div class="pulse"></div>
+        SESSION DATA
+      </div>
+    </div>
+  </header>
+
+  <!-- LINE-WIDE KPIs -->
+  <div class="section-label">Line-Wide Performance &mdash; Session Snapshot</div>
+  <div class="kpi-row">
+    <div class="kpi-card oee">
+      <div class="kpi-label">Overall OEE</div>
+      <div class="kpi-value">0.76<span class="kpi-unit">%</span></div>
+      <div class="kpi-sub">A × P × Q &nbsp;·&nbsp; Lab/Dev Mode</div>
+    </div>
+    <div class="kpi-card avail">
+      <div class="kpi-label">Availability</div>
+      <div class="kpi-value">20.3<span class="kpi-unit">%</span></div>
+      <div class="kpi-sub">Run / Planned Time</div>
+    </div>
+    <div class="kpi-card perf">
+      <div class="kpi-label">Performance</div>
+      <div class="kpi-value">3.73<span class="kpi-unit">%</span></div>
+      <div class="kpi-sub">Actual vs Ideal Rate</div>
+    </div>
+    <div class="kpi-card qual">
+      <div class="kpi-label">Quality</div>
+      <div class="kpi-value">99.8<span class="kpi-unit">%</span></div>
+      <div class="kpi-sub">Good Parts / Total</div>
+    </div>
+    <div class="kpi-card parts">
+      <div class="kpi-label">Parts Produced</div>
+      <div class="kpi-value">620</div>
+      <div class="kpi-sub">Ideal CT &nbsp;·&nbsp; 7.8 s</div>
+    </div>
+  </div>
+
+  <!-- TREND CHART + DONUT -->
+  <div class="charts-row">
+    <div class="chart-panel">
+      <div class="panel-title">OEE Component Trend — Session (14:25–14:47) <span>PLC 171 Pick &amp; Place</span></div>
+      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Time Utilization <span>Pick &amp; Place + Electro-Hyd.</span></div>
+      <div class="chart-wrap"><canvas id="donutChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- STATION CARDS -->
+  <div class="section-label">Station Status — All PLCs</div>
+  <div class="station-grid" id="stationGrid"></div>
+
+  <!-- BOTTOM CHARTS -->
+  <div class="bottom-row">
+    <div class="chart-panel">
+      <div class="panel-title">OEE Components by Station <span>Latest Value</span></div>
+      <div class="chart-wrap"><canvas id="stationBarChart"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Cycle Time Trend <span>Hydraulic Torquing · PLC 177</span></div>
+      <div class="chart-wrap"><canvas id="cycleChart"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <div class="panel-title">Fault Time Accumulation <span>Electro-Hydraulic · PLC 179</span></div>
+      <div class="chart-wrap"><canvas id="faultChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- SUB-STATION BREAKDOWN -->
+  <div class="section-label">Pick &amp; Place Sub-Station Detail — PLC 192.168.50.171</div>
+  <div class="sub-section">
+    <div class="table-panel">
+      <div class="panel-title" style="margin-bottom:12px;">Station Part Counts</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Station</th>
+            <th>Parts Count</th>
+            <th>Share of Max</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="stnCountTable"></tbody>
+      </table>
+    </div>
+    <div class="table-panel">
+      <div class="panel-title" style="margin-bottom:12px;">Alarm Byte Status</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Station</th>
+            <th>Alarm Code</th>
+            <th>State</th>
+          </tr>
+        </thead>
+        <tbody id="alarmTable"></tbody>
+      </table>
+      <div style="margin-top:14px; font-family:'IBM Plex Mono',monospace; font-size:0.62rem; color:var(--text-dim); line-height:1.8;">
+        <strong style="color:var(--text);">Note:</strong> Alarm byte 262144 (0x40000) indicates<br>
+        an active status flag &mdash; verify against PLC ladder<br>
+        logic for bit-level fault mapping.
+      </div>
+    </div>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div class="insight-box">
+    <div class="insight-title">&#9670; ANALYSIS INSIGHTS</div>
+    <div class="insights-grid">
+      <div class="insight-item">
+        <strong>OEE at 0.76%</strong> is expected for this lab configuration —
+        the system logs ~123 hrs of idle/planned time vs ~27 hrs actual run time,
+        typical for educational cell operation with frequent stops.
+      </div>
+      <div class="insight-item">
+        <strong>Hydraulic Torquing (PLC 177)</strong> shows a cycle time of
+        <strong>558.9 s</strong> vs 8.3 s for all other stations — this is the
+        line's pacing bottleneck (10 fewer parts produced: 610 vs 620).
+      </div>
+      <div class="insight-item">
+        <strong>Fault time of 5.26 hrs</strong> was recorded at both Pick &amp; Place
+        and Electro-Hydraulic stations. Stn3 counts = 0 suggests it was offline
+        or bypassed for this session.
+      </div>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <span>SOURCE: KPI_files / 8 PLCs / 59 CSV files / 2026-02-16</span>
+    <span>NCA&T ISE SENIOR DESIGN &mdash; VALVE ASSEMBLY LINE</span>
+  </div>
+
+</div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────────────
+const stationData = {
+  "171": { name:"Pick & Place",       plc:"192.168.50.171", oee:0.7578, availability:20.34, performance:3.73, quality:99.79, counts:620, run_time_hrs:26.98, idle_time_hrs:122.72, fault_time_hrs:5.26, cycle_time:8.29 },
+  "172": { name:"Gauging",            plc:"192.168.50.172", oee:0.7578, availability:20.34, performance:3.73, quality:99.79, counts:620, run_time_hrs:26.98, idle_time_hrs:122.72, fault_time_hrs:0,    cycle_time:8.29 },
+  "173": { name:"Indexing",           plc:"192.168.50.173", oee:0.7578, availability:20.34, performance:3.73, quality:99.79, counts:620, run_time_hrs:26.98, idle_time_hrs:122.72, fault_time_hrs:0,    cycle_time:8.29 },
+  "174": { name:"Sorting & Queuing",  plc:"192.168.50.174", oee:0.7578, availability:20.34, performance:3.73, quality:99.79, counts:620, run_time_hrs:26.98, idle_time_hrs:122.72, fault_time_hrs:0,    cycle_time:8.29 },
+  "175": { name:"Robotic Assembly",   plc:"192.168.50.175", oee:0.7578, availability:20.34, performance:3.73, quality:99.79, counts:620, run_time_hrs:26.98, idle_time_hrs:122.72, fault_time_hrs:0,    cycle_time:8.29 },
+  "176": { name:"Torquing",           plc:"192.168.50.176", oee:0.7578, availability:20.34, performance:3.73, quality:99.79, counts:620, run_time_hrs:26.98, idle_time_hrs:122.72, fault_time_hrs:0,    cycle_time:8.29 },
+  "177": { name:"Hydraulic Torquing", plc:"192.168.50.177", oee:0.7593, availability:20.08, performance:3.79, quality:99.78, counts:610, run_time_hrs:26.41, idle_time_hrs:122.24, fault_time_hrs:0,    cycle_time:558.94 },
+  "179": { name:"Electro-Hydraulic",  plc:"192.168.50.179", oee:0.7578, availability:20.34, performance:3.73, quality:99.79, counts:620, run_time_hrs:26.98, idle_time_hrs:122.72, fault_time_hrs:5.26, cycle_time:8.29 },
+};
+
+const tsTimes = ["14:25","14:25","14:26","14:26","14:26","14:27","14:27","14:27","14:28","14:28","14:28","14:29","14:29","14:29","14:30","14:30","14:30","14:31","14:31","14:31","14:32","14:32","14:32","14:33","14:33","14:33","14:34","14:34","14:34","14:35","14:35","14:36","14:36","14:37","14:37","14:38","14:38","14:39","14:39","14:40","14:40","14:41","14:41","14:42","14:43","14:44","14:45","14:45","14:46","14:46","14:47","14:47","14:47"];
+const tsOEE  = [0.7474,0.7483,0.7491,0.7501,0.7501,0.7501,0.7501,0.7501,0.7501,0.7501,0.7501,0.7501,0.7501,0.7501,0.7509,0.7509,0.7509,0.7509,0.7518,0.7518,0.7518,0.7518,0.7526,0.7526,0.7534,0.7534,0.7534,0.7534,0.7534,0.7543,0.7543,0.7543,0.7543,0.7551,0.7551,0.7551,0.7551,0.7559,0.7559,0.7559,0.7559,0.7559,0.7568,0.7568,0.7568,0.7568,0.7568,0.7568,0.7578,0.7578,0.7578,0.7578,0.7578];
+const tsAvail = [20.13,20.13,20.13,20.13,20.13,20.13,20.13,20.13,20.13,20.13,20.13,20.13,20.13,20.13,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.22,20.25,20.25,20.25,20.25,20.29,20.29,20.29,20.29,20.3,20.3,20.3,20.3,20.3,20.31,20.31,20.31,20.31,20.31,20.31,20.34,20.34,20.34,20.34,20.34];
+const tsPerf  = [3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.72,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73,3.73];
+
+const faultTimes = [4.77,4.77,4.77,4.77,4.77,4.77,4.77,4.77,4.88,4.88,4.88,4.99,4.99,4.99,5.06,5.06,5.06,5.12,5.12,5.12,5.16,5.16,5.16,5.2,5.2,5.22,5.22,5.24,5.24,5.25,5.25,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26,5.26];
+
+const cycleTimes = [448.6,448.6,449.0,449.4,449.9,450.3,450.7,451.2,451.6,452.0,452.5,453.0,453.4,453.8,454.3,454.7,455.2,455.6,456.1,456.5,457.0,457.5,458.0,458.5,459.0,459.4,459.9,460.4,460.9,461.4,461.9,462.4,462.9,463.5,464.0,464.5,465.0,465.5,466.0,466.5,467.1,467.6,468.1,468.6,469.1,469.7,470.3,470.9,471.5,472.0,472.5];
+const cycleTsTimes = tsTimes.slice(0,51);
+
+const stnCounts  = { Stn1:620, Stn2:1622, Stn3:0, Stn4:904, Stn5:298, Stn6:424, Stn7:83, Stn9:280 };
+const alarmData  = { Stn1:0, Stn2:262144, Stn3:262144, Stn4:262144, Stn5:262144, Stn6:262176, Stn7:262144, Stn9:262144 };
+
+// ── CHART DEFAULTS ────────────────────────────────────────────────────────
+Chart.defaults.color = '#5a7a96';
+Chart.defaults.font.family = "'IBM Plex Mono', monospace";
+Chart.defaults.font.size = 10;
+Chart.defaults.borderColor = '#1a2d42';
+
+// ── TREND CHART ───────────────────────────────────────────────────────────
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: tsTimes,
+    datasets: [
+      {
+        label: 'Availability %',
+        data: tsAvail,
+        borderColor: '#00ff87',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: false,
+        yAxisID: 'yRight',
+      },
+      {
+        label: 'Performance %',
+        data: tsPerf,
+        borderColor: '#ffb300',
+        borderWidth: 1.5,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: false,
+        yAxisID: 'yRight',
+      },
+      {
+        label: 'OEE %',
+        data: tsOEE,
+        borderColor: '#00e5ff',
+        borderWidth: 2,
+        pointRadius: 0,
+        tension: 0.4,
+        fill: {target:'origin', above:'rgba(0,229,255,0.05)'},
+        yAxisID: 'yLeft',
+      },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode:'index', intersect:false },
+    plugins: {
+      legend: { position:'top', labels:{ boxWidth:12, padding:14 } },
+      tooltip: { backgroundColor:'#0d1520', borderColor:'#1a2d42', borderWidth:1 }
+    },
+    scales: {
+      x: { grid:{ color:'rgba(26,45,66,0.6)' }, ticks:{ maxTicksLimit:8 } },
+      yLeft: {
+        position:'left', min:0.72, max:0.8,
+        grid:{ color:'rgba(26,45,66,0.6)' },
+        ticks:{ callback:v=>v.toFixed(2)+'%' },
+        title:{ display:true, text:'OEE %' }
+      },
+      yRight: {
+        position:'right', min:0, max:25,
+        grid:{ drawOnChartArea:false },
+        ticks:{ callback:v=>v+'%' },
+        title:{ display:true, text:'Avail / Perf %' }
+      },
+    }
+  }
+});
+
+// ── DONUT CHART ───────────────────────────────────────────────────────────
+const totalHrs = 26.98 + 122.72 + 5.26;
+new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Run Time', 'Idle Time', 'Fault Time'],
+    datasets: [{
+      data: [26.98, 122.72, 5.26],
+      backgroundColor: ['rgba(0,229,255,0.7)','rgba(26,45,66,0.9)','rgba(255,61,87,0.7)'],
+      borderColor: ['#00e5ff','#1e3550','#ff3d57'],
+      borderWidth: 1.5,
+      hoverOffset: 6,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    cutout: '65%',
+    plugins: {
+      legend: { position:'bottom', labels:{ boxWidth:10, padding:12 } },
+      tooltip: {
+        backgroundColor:'#0d1520', borderColor:'#1a2d42', borderWidth:1,
+        callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed.toFixed(2)} hrs (${(ctx.parsed/totalHrs*100).toFixed(1)}%)` }
+      }
+    }
+  }
+});
+
+// ── STATION GRID ──────────────────────────────────────────────────────────
+const grid = document.getElementById('stationGrid');
+Object.entries(stationData).forEach(([id, s]) => {
+  const hasFault = s.fault_time_hrs > 0;
+  const isBottleneck = s.cycle_time > 100;
+  const statusClass = hasFault ? 'fault' : isBottleneck ? 'warn' : 'ok';
+  const card = document.createElement('div');
+  card.className = 'stn-card';
+  card.innerHTML = `
+    <div class="stn-header">
+      <div>
+        <div class="stn-name">${s.name}</div>
+        <div class="stn-plc">PLC ${s.plc}</div>
+      </div>
+      <div class="stn-status ${statusClass}"></div>
+    </div>
+    <div class="stn-metrics">
+      <div class="stn-metric-item">
+        <div class="stn-metric-label">OEE</div>
+        <div class="stn-metric-val">${s.oee.toFixed(2)}<span style="font-size:0.6rem;color:var(--text-dim)">%</span></div>
+      </div>
+      <div class="stn-metric-item">
+        <div class="stn-metric-label">Parts</div>
+        <div class="stn-metric-val">${s.counts}</div>
+      </div>
+      <div class="stn-metric-item">
+        <div class="stn-metric-label">Cycle T</div>
+        <div class="stn-metric-val" style="${isBottleneck?'color:var(--amber)':''}">${s.cycle_time >= 60 ? (s.cycle_time/60).toFixed(1)+'m' : s.cycle_time+'s'}</div>
+      </div>
+      <div class="stn-metric-item">
+        <div class="stn-metric-label">Fault</div>
+        <div class="stn-metric-val" style="${hasFault?'color:var(--red)':''}">${s.fault_time_hrs > 0 ? s.fault_time_hrs+'h' : '—'}</div>
+      </div>
+    </div>
+    <div class="stn-oee-bar"><div class="stn-oee-fill" style="width:${Math.min(s.availability,100)}%"></div></div>
+  `;
+  grid.appendChild(card);
+});
+
+// ── STATION BAR CHART ─────────────────────────────────────────────────────
+const stationNames = Object.values(stationData).map(s => s.name.replace(' & ','\n& '));
+new Chart(document.getElementById('stationBarChart'), {
+  type: 'bar',
+  data: {
+    labels: stationNames,
+    datasets: [
+      { label:'Availability %', data: Object.values(stationData).map(s=>s.availability), backgroundColor:'rgba(0,255,135,0.5)', borderColor:'#00ff87', borderWidth:1 },
+      { label:'Performance %',  data: Object.values(stationData).map(s=>s.performance),  backgroundColor:'rgba(255,179,0,0.5)',  borderColor:'#ffb300', borderWidth:1 },
+      { label:'Quality %',      data: Object.values(stationData).map(s=>s.quality),       backgroundColor:'rgba(167,139,250,0.3)',borderColor:'#a78bfa', borderWidth:1 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { position:'top', labels:{ boxWidth:10, padding:10 } },
+      tooltip: { backgroundColor:'#0d1520', borderColor:'#1a2d42', borderWidth:1 }
+    },
+    scales: {
+      x: { grid:{ color:'rgba(26,45,66,0.6)' }, ticks:{ font:{size:8}, maxRotation:30 } },
+      y: { grid:{ color:'rgba(26,45,66,0.6)' }, min:0, max:105, ticks:{ callback:v=>v+'%' } }
+    }
+  }
+});
+
+// ── CYCLE CHART ───────────────────────────────────────────────────────────
+new Chart(document.getElementById('cycleChart'), {
+  type: 'line',
+  data: {
+    labels: cycleTsTimes,
+    datasets: [{
+      label: 'Last Cycle Time (s)',
+      data: cycleTimes,
+      borderColor: '#ffb300',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      tension: 0.3,
+      fill: { target:'origin', above:'rgba(255,179,0,0.06)' },
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display:false },
+      tooltip: { backgroundColor:'#0d1520', borderColor:'#1a2d42', borderWidth:1,
+        callbacks:{ label: ctx => ` ${ctx.parsed.y.toFixed(1)} s` } }
+    },
+    scales: {
+      x: { grid:{ color:'rgba(26,45,66,0.6)' }, ticks:{ maxTicksLimit:6 } },
+      y: { grid:{ color:'rgba(26,45,66,0.6)' }, ticks:{ callback:v=>v+'s' } }
+    }
+  }
+});
+
+// ── FAULT CHART ───────────────────────────────────────────────────────────
+new Chart(document.getElementById('faultChart'), {
+  type: 'line',
+  data: {
+    labels: tsTimes,
+    datasets: [{
+      label: 'Cumulative Fault Time (hrs)',
+      data: faultTimes,
+      borderColor: '#ff3d57',
+      borderWidth: 1.5,
+      pointRadius: 0,
+      tension: 0.3,
+      fill: { target:'origin', above:'rgba(255,61,87,0.07)' },
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { display:false },
+      tooltip: { backgroundColor:'#0d1520', borderColor:'#1a2d42', borderWidth:1,
+        callbacks:{ label: ctx => ` ${ctx.parsed.y.toFixed(3)} hrs` } }
+    },
+    scales: {
+      x: { grid:{ color:'rgba(26,45,66,0.6)' }, ticks:{ maxTicksLimit:6 } },
+      y: { min:4.5, grid:{ color:'rgba(26,45,66,0.6)' }, ticks:{ callback:v=>v+'h' } }
+    }
+  }
+});
+
+// ── STATION COUNT TABLE ───────────────────────────────────────────────────
+const maxCount = Math.max(...Object.values(stnCounts));
+const tbody = document.getElementById('stnCountTable');
+Object.entries(stnCounts).forEach(([stn, cnt]) => {
+  const pct = maxCount > 0 ? (cnt / maxCount * 100).toFixed(1) : 0;
+  const isZero = cnt === 0;
+  tbody.innerHTML += `
+    <tr>
+      <td>${stn}</td>
+      <td class="td-val" style="${isZero?'color:var(--red)':''}">${cnt.toLocaleString()}</td>
+      <td>
+        <div class="bar-inline">
+          <div class="bar-inline-track">
+            <div class="bar-inline-fill" style="width:${pct}%;background:${isZero?'var(--red)':'var(--cyan)'}"></div>
+          </div>
+          <span style="font-size:0.62rem;color:var(--text-dim);width:32px;text-align:right">${pct}%</span>
+        </div>
+      </td>
+      <td><span class="alarm-badge ${isZero?'alarm-warn':'alarm-ok'}">${isZero?'OFFLINE':'ACTIVE'}</span></td>
+    </tr>`;
+});
+
+// ── ALARM TABLE ───────────────────────────────────────────────────────────
+const alarmTbody = document.getElementById('alarmTable');
+Object.entries(alarmData).forEach(([stn, code]) => {
+  const clear = code === 0;
+  alarmTbody.innerHTML += `
+    <tr>
+      <td>${stn}</td>
+      <td class="td-val" style="font-size:0.68rem">${code === 0 ? '0x000000' : '0x' + code.toString(16).toUpperCase()}</td>
+      <td><span class="alarm-badge ${clear?'alarm-ok':'alarm-warn'}">${clear?'CLEAR':'ACTIVE'}</span></td>
+    </tr>`;
+});
+</script>
+</body>
+</html>
